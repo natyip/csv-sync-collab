@@ -1,3 +1,8 @@
+# Ignore SQLite database files and data directories
+backend/data/*.sqlite
+backend/data/*.sqlite-journal
+backend/data/
+
 # Logs
 logs
 *.log
