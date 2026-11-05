@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import db from '../config/database';
+import { processCsvBuffer } from '../services/csvService';
 
 export const getRecords = (req: Request, res: Response): void => {
   try {
@@ -51,5 +52,27 @@ export const getRecords = (req: Request, res: Response): void => {
   } catch (error: any) {
     console.error('Error fetching records:', error);
     res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+};
+
+export const uploadCsv = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const file = (req as any).file;
+    if (!file) {
+      res.status(400).json({ success: false, error: 'No CSV file uploaded.' });
+      return;
+    }
+
+    // Process the uploaded file buffer
+    const { successCount, errors } = await processCsvBuffer(file.buffer);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully processed ${successCount} records.`,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error: any) {
+    console.error('Error processing CSV upload:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal Server Error' });
   }
 };
