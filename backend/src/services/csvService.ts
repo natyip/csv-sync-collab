@@ -49,8 +49,6 @@ export const processCsvBuffer = async (buffer: Buffer): Promise<{ successCount: 
       .on('data', (data) => {
         if (!headersValidated) return;
         rowNumber++;
-        // DEBUG: See what keys and values are actually arriving
-        console.log(`Row ${rowNumber} raw data:`, data);
 
         // Validate that all fields are mandatory and non-empty for every row
         const missingFields = EXPECTED_HEADERS.filter(field => {
@@ -71,7 +69,6 @@ export const processCsvBuffer = async (buffer: Buffer): Promise<{ successCount: 
           if (results.length === 0 && errors.length > 0) {
             return resolve({ successCount: 0, conflictsCount: 0, errors });
           }
-
           // 1. Run Conflict Analysis against existing database records
           const { conflicts, validInserts, identicalRecords } = analyzeCsvConflicts(results);
 
