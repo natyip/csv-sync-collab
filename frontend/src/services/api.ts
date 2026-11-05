@@ -1,37 +1,31 @@
-import type { PaginatedResponse, ConflictResponse } from '../types';
+import type { PaginatedResponse, ResolutionItem, ConflictResponse, UploadCsvSuccess } from '../types';
 
-// Update port if your backend runs on a different port (e.g., 5000)
 const API_BASE_URL = 'http://localhost:5000/api';
 
 /**
- * Fetch paginated records with optional search query filtering
+ * Fetch paginated and searched records from the backend.
  */
-export async function fetchRecords(
-  page = 1,
-  limit = 10,
-  search = ''
+export async function fetchRecord(
+  page: number = 1,
+  limit: number = 10,
+  search: string = ''
 ): Promise<PaginatedResponse> {
-  const queryParams = new URLSearchParams({
-    page: page.toString(),
-    limit: limit.toString(),
-    search,
-  });
-
-  const response = await fetch(`${API_BASE_URL}/records?${queryParams.toString()}`);
+  const url = `${API_BASE_URL}/records?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+  
+  const response = await fetch(url);
   
   if (!response.ok) {
     throw new Error(`Error fetching records: ${response.statusText}`);
   }
 
-  return response.json();
+  const json: PaginatedResponse = await response.json();
+  return json;
 }
 
 /**
- * Submit conflict resolutions (KEEP vs. OVERWRITE) to the backend
+ * Submit user conflict resolutions to the backend.
  */
-export async function resolveConflicts(
-  resolutions: { id: string | number; resolution: 'KEEP' | 'OVERWRITE' }[]
-): Promise<ConflictResponse> {
+export async function resolveConflicts(resolutions: ResolutionItem[]): Promise<ConflictResponse> {
   const response = await fetch(`${API_BASE_URL}/resolve`, {
     method: 'POST',
     headers: {
@@ -44,5 +38,28 @@ export async function resolveConflicts(
     throw new Error(`Error resolving conflicts: ${response.statusText}`);
   }
 
-  return response.json();
+  const json: ConflictResponse = await response.json();
+  return json;
+}
+
+/**
+ * Upload a CSV file via multipart/form-data to the backend upload endpoint.
+ * Returns response containing message and stats (or triggers conflicts via socket listeners).
+ */
+export async function uploadCsv(file: File): Promise<UploadCsvSuccess> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/upload`, {
+    method: 'POST',
+    // Do NOT set Content-Type header manually for FormData; browser handles it automatically.
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error uploading CSV file: ${response.statusText}`);
+  }
+
+  const json: UploadCsvSuccess = await response.json();
+  return json;
 }

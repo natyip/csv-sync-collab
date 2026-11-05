@@ -7,27 +7,53 @@ export interface RecordItem {
   updatedAt?: string;
 }
 
-export interface PaginationMetadata {
-  currentPage: number;
-  totalPages: number;
-  totalRecords: number;
-  limit: number;
-}
+// export interface PaginationMetadata {
+//   currentPage: number;
+//   totalPages: number;
+//   totalRecords: number;
+//   limit: number;
+// }
 
 export interface PaginatedResponse {
+  success: boolean;
   data: RecordItem[];
-  meta: PaginationMetadata;
+  pagination: {
+    totalRecords: number;
+    totalPages: number;
+    currentPage: number;
+    limit: number;
+  };
 }
-
 export interface ConflictItem {
   id: string | number;
   existingRecord: RecordItem;
   incomingRecord: RecordItem;
 }
 
+export interface ConflictResolutionStats {
+  overwritten: number;
+  kept: number;
+}
+
+export interface UploadCsvSuccess {
+  success: boolean;
+  message: string;
+  errors: number  | undefined;
+}
+
 export interface ConflictResponse {
   success: boolean;
-  message?: string;
-  conflicts?: ConflictItem[];
-  updatedCount?: number;
+  message: string;
+  stats: ConflictResolutionStats;
+}
+
+export interface ResolutionItem {
+  id: number;
+  action: 'KEEP' | 'OVERWRITE';
+  incomingData?: {
+    postId: number | string;
+    name: string;
+    email: string;
+    body: string;
+  };
 }
