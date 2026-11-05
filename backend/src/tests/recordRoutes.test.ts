@@ -13,7 +13,7 @@ vi.mock('../controllers/recordController', () => ({
 // Setup a clean Express app instance mounting the router
 const app = express();
 app.use(express.json());
-app.use(router);
+app.use('/api', router);
 
 describe('Record Routes Integration Tests', () => {
   beforeEach(() => {
