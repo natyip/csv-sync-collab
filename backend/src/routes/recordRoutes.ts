@@ -35,6 +35,6 @@ router.get('/api/records', getRecords);
 router.post('/api/upload', upload.single('file'), uploadCsv);
 
 // New conflict resolution endpoint
-// router.post('/resolve', resolveConflicts);
+router.post('/resolve', resolveConflicts);
 
 export default router;

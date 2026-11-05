@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import db from '../config/database';
 import { processCsvBuffer } from '../services/csvService';
+import { broadcastDataUpdated } from '../sockets/eventEmitter';
 
 export const getRecords = (req: Request, res: Response): void => {
   try {
@@ -74,5 +75,79 @@ export const uploadCsv = async (req: Request, res: Response): Promise<void> => {
   } catch (error: any) {
     console.error('Error processing CSV upload:', error);
     res.status(500).json({ success: false, error: error.message || 'Internal Server Error' });
+  }
+};
+
+interface ResolutionItem {
+  id: number;
+  action: 'KEEP' | 'OVERWRITE';
+  incomingData?: {
+    postId: number | string;
+    name: string;
+    email: string;
+    body: string;
+  };
+}
+
+export const resolveConflicts = async (req: Request, res: Response) => {
+  try {
+    const { resolutions }: { resolutions: ResolutionItem[] } = req.body;
+
+    if (!Array.isArray(resolutions) || resolutions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or empty resolutions payload provided.',
+      });
+    }
+
+    // Prepare the SQLite update statement for items marked as OVERWRITE
+    const updateStmt = db.prepare(`
+      UPDATE records 
+      SET postId = @postId, name = @name, email = @email, body = @body
+      WHERE id = @id
+    `);
+
+    let overwriteCount = 0;
+    let keepCount = 0;
+
+    // Wrap resolutions in an atomic transaction
+    const resolveTransaction = db.transaction((items: ResolutionItem[]) => {
+      for (const item of items) {
+        if (item.action === 'OVERWRITE' && item.incomingData) {
+          updateStmt.run({
+            id: Number(item.id),
+            postId: Number(item.incomingData.postId),
+            name: String(item.incomingData.name).trim(),
+            email: String(item.incomingData.email).trim(),
+            body: String(item.incomingData.body).trim(),
+          });
+          overwriteCount++;
+        } else if (item.action === 'KEEP') {
+          // Explicitly keeping existing DB record; no DB mutation needed
+          keepCount++;
+        }
+      }
+    });
+
+    resolveTransaction(resolutions);
+
+    // Broadcast DATA_UPDATED so all connected clients sync their data tables instantly
+    broadcastDataUpdated(`Conflict resolution completed: ${overwriteCount} overwritten, ${keepCount} kept.`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully processed ${resolutions.length} conflict resolutions.`,
+      stats: {
+        overwritten: overwriteCount,
+        kept: keepCount,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error processing conflict resolution:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process conflict resolutions.',
+      error: error.message,
+    });
   }
 };
