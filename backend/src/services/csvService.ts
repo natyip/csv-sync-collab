@@ -3,6 +3,7 @@ import csv from 'csv-parser';
 import db from '../config/database';
 import { analyzeCsvConflicts } from './conflictService';
 import { getIo } from '../sockets/socketHandler';
+import { broadcastConflictDetected, broadcastDataUpdated } from '../sockets/eventEmitter';
 
 // Define the exact required schema headers
 const EXPECTED_HEADERS = ['postId', 'id', 'name', 'email', 'body'];
@@ -99,16 +100,15 @@ export const processCsvBuffer = async (buffer: Buffer): Promise<{ successCount: 
 
           // Save valid new inserts and identical updates immediately
           insertMany([...validInserts, ...identicalRecords]);
-
+          // if above is successful then broadcast DATA_UPDATED
+          if (validInserts.length > 0 || identicalRecords.length > 0) {
+            broadcastDataUpdated(`Successfully imported ${validInserts.length + identicalRecords.length} records from CSV.`);
+          }
+          
           // 3. Emit Socket.IO event if any conflicts are detected
           if (conflicts.length > 0) {
             try {
-              const io = getIo();
-              io.emit('CONFLICT_DETECTED', {
-                message: `Found ${conflicts.length} record conflicts requiring resolution.`,
-                conflicts,
-              });
-              console.log(`⚡ Emitted CONFLICT_DETECTED event for ${conflicts.length} items.`);
+              broadcastConflictDetected(conflicts);
             } catch (socketErr) {
               console.warn('Socket.IO not initialized or failed to emit:', socketErr);
             }
