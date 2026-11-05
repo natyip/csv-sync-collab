@@ -220,8 +220,6 @@ Test suites:
 | `socketHandler.test.ts` | Socket.IO server init + singleton getter |
 | `eventEmitter.test.ts` | Event broadcast helpers |
 
-> The CI workflow (`.github/workflows/backend-ci.yml`) runs `npm run test_github`, which excludes the `database.test.ts` suite (it requires a writable filesystem not available in the CI sandbox).
-
 ### Frontend Tests
 
 ```bash
@@ -235,12 +233,75 @@ Test suites: `api.test.ts` (REST client) and `socket.test.ts` (Socket.IO client)
 
 ## Continuous Integration
 
-A GitHub Actions workflow (`.github/workflows/backend-ci.yml`) runs on every push and pull request to `main`/`master`. It:
+Automated building and testing runs on every **push** and **pull request** to `main`/`master` via GitHub Actions.
 
-1. Checks out the code
-2. Sets up Node.js 20 with npm cache
-3. Installs backend dependencies
-4. Runs the backend unit test suite
+### Workflow: Backend CI (`.github/workflows/backend-ci.yml`)
+
+**Triggers:**
+- `push` to `main` or `master`
+- `pull_request` targeting `main` or `master`
+
+**Pipeline steps:**
+
+| Step | Action | Detail |
+|------|--------|--------|
+| 1 | Checkout Code | `actions/checkout@v4` |
+| 2 | Setup Node.js | `actions/setup-node@v4`, Node 20, npm cache enabled |
+| 3 | Install Dependencies | `npm install` in `./backend` |
+| 4 | Run Unit Tests | `npm run test_github` (Vitest, excludes `database.test.ts`) |
+
+**Workflow file:**
+
+```yaml
+name: Backend CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Unit Tests
+        run: npm run test_github
+```
+
+> **Note:** The CI uses `npm run test_github`, which excludes the `database.test.ts` suite because it requires a writable filesystem path that is not available in the CI sandbox. All other backend test suites run in CI.
+
+### Running CI checks locally
+
+To replicate what CI runs before pushing:
+
+```bash
+# Backend (same command CI uses)
+cd backend
+npm run test_github
+
+# Frontend
+cd frontend
+npm test
+```
 
 ---
 
