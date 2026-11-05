@@ -24,15 +24,15 @@ const upload = multer({
 });
 
 // Basic health-check route
-router.get('/api/health', (req: Request, res: Response) => {
+router.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'Backend is running successfully' });
 });
 
 // Records listing and search route
-router.get('/api/records', getRecords);
+router.get('/records', getRecords);
 
 // CSV Upload route (handles single file upload with field name "file")
-router.post('/api/upload', upload.single('file'), uploadCsv);
+router.post('/upload', upload.single('file'), uploadCsv);
 
 // New conflict resolution endpoint
 router.post('/resolve', resolveConflicts);
