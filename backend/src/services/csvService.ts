@@ -1,6 +1,8 @@
 import { Readable } from 'stream';
 import csv from 'csv-parser';
 import db from '../config/database';
+import { analyzeCsvConflicts } from './conflictService';
+import { getIo } from '../sockets/socketHandler';
 
 // Define the exact required schema headers
 const EXPECTED_HEADERS = ['postId', 'id', 'name', 'email', 'body'];
@@ -14,7 +16,7 @@ interface CsvRow {
   [key: string]: any;
 }
 
-export const processCsvBuffer = async (buffer: Buffer): Promise<{ successCount: number; errors: string[] }> => {
+export const processCsvBuffer = async (buffer: Buffer): Promise<{ successCount: number; conflictsCount: number; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const results: CsvRow[] = [];
     const errors: string[] = [];
@@ -64,14 +66,15 @@ export const processCsvBuffer = async (buffer: Buffer): Promise<{ successCount: 
       .on('error', (error) => {
         reject(error);
       })
-      .on('end', () => {
-        try {
-          // If no valid rows passed validation and there were parsing errors, you can choose to handle it
+      .on('end', () => {try {
           if (results.length === 0 && errors.length > 0) {
-            return resolve({ successCount: 0, errors });
+            return resolve({ successCount: 0, conflictsCount: 0, errors });
           }
 
-          // Use a SQLite transaction for safe, high-performance batch insertion
+          // 1. Run Conflict Analysis against existing database records
+          const { conflicts, validInserts, identicalRecords } = analyzeCsvConflicts(results);
+
+          // 2. Use a SQLite transaction for safe, high-performance batch insertion of non-conflicting rows
           const insertStmt = db.prepare(`
             INSERT INTO records (id, postId, name, email, body)
             VALUES (@id, @postId, @name, @email, @body)
@@ -94,8 +97,28 @@ export const processCsvBuffer = async (buffer: Buffer): Promise<{ successCount: 
             }
           });
 
-          insertMany(results);
-          resolve({ successCount: results.length, errors });
+          // Save valid new inserts and identical updates immediately
+          insertMany([...validInserts, ...identicalRecords]);
+
+          // 3. Emit Socket.IO event if any conflicts are detected
+          if (conflicts.length > 0) {
+            try {
+              const io = getIo();
+              io.emit('CONFLICT_DETECTED', {
+                message: `Found ${conflicts.length} record conflicts requiring resolution.`,
+                conflicts,
+              });
+              console.log(`⚡ Emitted CONFLICT_DETECTED event for ${conflicts.length} items.`);
+            } catch (socketErr) {
+              console.warn('Socket.IO not initialized or failed to emit:', socketErr);
+            }
+          }
+
+          resolve({
+            successCount: validInserts.length + identicalRecords.length,
+            conflictsCount: conflicts.length,
+            errors,
+          });
         } catch (dbError: any) {
           reject(dbError);
         }

@@ -4,7 +4,10 @@ import { processCsvBuffer } from '../services/csvService';
 // Mock the database dependency so unit tests isolate the CSV parsing logic
 vi.mock('../config/database', () => ({
   default: {
-    prepare: vi.fn(() => ({ run: vi.fn() })),
+    prepare: vi.fn(() => ({
+      all: vi.fn(() => []), // Added .all() returning empty array for conflict analysis lookup
+      run: vi.fn(),
+    })),
     transaction: vi.fn((fn) => (rows: any[]) => fn(rows)),
   },
 }));
