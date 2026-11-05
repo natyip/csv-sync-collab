@@ -29,7 +29,7 @@ A real-time CSV data management application built for the Technical Assessment. 
   - **Displays a real-time diff UI** showing old vs. new values per changed field
 - Identical records are auto-accepted; genuinely new records are inserted immediately
 
-### 5. Conflict Resolution (Optional feature — implemented)
+### 5. Conflict Resolution (Optional feature — Only BackEnd code implemented)
 - Users can choose, per conflicting record, to **KEEP** the existing version or **OVERWRITE** with the incoming version
 - Resolutions are applied atomically in a single SQLite transaction
 - A `DATA_UPDATED` event is broadcast so every connected session reflects the final state within seconds
