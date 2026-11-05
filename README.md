@@ -113,10 +113,10 @@ git clone <your-repo-url>
 cd <repo-folder>
 
 # 2. Build and start all services
-docker compose up --build
+docker compose up --build -d
 
 # 3. Open the app
-#    Frontend: http://localhost:3000
+#    Frontend: http://localhost:5173
 #    Backend API: http://localhost:5000/api
 #    Health check: http://localhost:5000/api/health
 ```
