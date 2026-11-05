@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getRecords } from '../controllers/recordController';
 import { Request, Response } from 'express';
+import { resolveConflicts } from '../controllers/recordController';
 
 // Mock the database module
 const mockPrepare = vi.fn();
+const mockTransaction = vi.fn((callback) => (items: any) => callback(items));
 vi.mock('../config/database', () => ({
   default: {
     prepare: (query: string) => mockPrepare(query),
+    transaction: (callback: Function) => mockTransaction(callback),
   },
 }));
 
@@ -133,6 +136,67 @@ describe('Paginated Listing & Search Controller (GET /api/records)', () => {
       expect.objectContaining({
         data: [],
         pagination: expect.objectContaining({ totalRecords: 0 }),
+      })
+    );
+  });
+});
+
+
+describe('Conflict Resolution Controller (POST /api/resolve)', () => {
+  let req: Partial<Request>;
+  let res: Partial<Response>;
+  let jsonSpy: any;
+  let statusSpy: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    jsonSpy = vi.fn();
+    statusSpy = vi.fn().mockReturnValue({ json: jsonSpy });
+    res = {
+      status: statusSpy,
+      json: jsonSpy,
+    };
+  });
+
+  it('should return 400 if resolutions payload is missing or empty', async () => {
+    req = { body: { resolutions: [] } };
+
+    await resolveConflicts(req as Request, res as Response);
+
+    expect(statusSpy).toHaveBeenCalledWith(400);
+    expect(jsonSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false })
+    );
+  });
+
+  it('should successfully process OVERWRITE actions and execute database updates', async () => {
+    req = {
+      body: {
+        resolutions: [
+          {
+            id: 1,
+            action: 'OVERWRITE',
+            incomingData: { postId: 10, name: 'New Name', email: 'new@test.com', body: 'New Body' },
+          },
+          {
+            id: 2,
+            action: 'KEEP',
+          },
+        ],
+      },
+    };
+
+    const runSpy = vi.fn();
+    mockPrepare.mockReturnValue({ run: runSpy });
+
+    await resolveConflicts(req as Request, res as Response);
+
+    expect(statusSpy).toHaveBeenCalledWith(200);
+    expect(runSpy).toHaveBeenCalledTimes(1); // Only OVERWRITE runs an update statement
+    expect(jsonSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        stats: { overwritten: 1, kept: 1 },
       })
     );
   });
